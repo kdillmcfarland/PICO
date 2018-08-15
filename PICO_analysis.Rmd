@@ -130,11 +130,56 @@ pairwise.adonis.all(OTU, meta, factors=meta$treat_time, sim.method="jaccard", st
 ## SIMPER
 Similarity percentages of Treatment:Time_Point at OTU, genus, and family levels
 ```{r eval=FALSE}
-simper.pretty(x=OTU, metrics=meta, interesting="treat_time", perc_cutoff=1, low_cutoff='n', output_name="simper/OTU")
+simper.pretty(x=OTU, metrics=meta, interesting="treat_time", perc_cutoff=1, low_cutoff='n', output_name="results/simper/OTU")
 
-simper.pretty(x=genus, metrics=meta, interesting="treat_time", perc_cutoff=1, low_cutoff='n', low_val=0.001, output_name="simper/Genus")
+simper.pretty(x=genus, metrics=meta, interesting="treat_time", perc_cutoff=1, low_cutoff='n', low_val=0.001, output_name="results/simper/Genus")
 
-simper.pretty(x=family, metrics=meta, interesting="treat_time", perc_cutoff=1, low_cutoff='n', output_name="simper/Family")
+simper.pretty(x=family, metrics=meta, interesting="treat_time", perc_cutoff=1, low_cutoff='n', output_name="results/simper/Family")
+```
+
+### Merge results
+Read in SIMPER results and select at cutoffs
+
+* OTUs and genera: minimum 2%
+* families: minimum 5%
+
+```{r}
+OTU.simper = read.csv("results/simper/OTU_clean_simper.csv") %>% 
+  mutate(level="OTU") %>% 
+  filter(SIMPER>=0.02)
+  
+gen.simper = read.csv("results/simper/Genus_clean_simper.csv") %>% 
+  mutate(level="genus") %>% 
+  filter(SIMPER>=0.02)
+  
+fam.simper = read.csv("results/simper/Family_clean_simper.csv") %>% 
+  mutate(level="family") %>% 
+  filter(SIMPER>=0.05)
+```
+
+Merge and select comparisons of interest
+```{r}
+all.simper = OTU.simper %>% 
+  rbind(gen.simper) %>% 
+  rbind(fam.simper) %>% 
+  dplyr::select(-X) %>% 
+  rename(taxon=OTU) %>% 
+  filter(Comparison %in% c("Placebo_0_Placebo_4",
+                           "Placebo_4_Placebo_8",
+                           "Placebo_0_Placebo_8",
+                           "Drug_0_Drug_4",
+                           "Drug_4_Drug_8",
+                           "Drug_0_Drug_8",
+                           "Placebo_0_Drug_0",
+                           "Placebo_4_Drug_4",
+                           "Placebo_8_Drug_8"))
+
+write.csv(all.simper, "results/simper/all.simper.csv", row.names=FALSE)
+```
+
+Determine unique taxa lists of interest
+```{r}
+unique(all.simper$taxon)
 ```
 
 # Taxa of interest
@@ -145,29 +190,29 @@ For OTUs
 ```{r eval=FALSE}
 OTU.list = c("Otu00001","Otu00002","Otu00003","Otu00004","Otu00005","Otu00006","Otu00007","Otu00008","Otu00009","Otu00010","Otu00011","Otu00012","Otu00013","Otu00014","Otu00015","Otu00016","Otu00017","Otu00019","Otu00023","Otu00024","Otu00025","Otu00027","Otu00032")
 
-nparLD.pval.fxn(OTU, OTU.list, "nparLD/OTU")
+nparLD.pval.fxn(OTU, OTU.list, "results/nparLD/OTU")
 ```
 
 For genera
 ```{r eval=FALSE}
 genus.list = c("g__Akkermansia","g__Bacteroides","g__Bifidobacterium","g__Blautia","g__Clostridium","g__Collinsella","g__Coprococcus","g__Dorea","g__Enterococcus","g__Escherichia","g__Faecalibacterium","g__Lactobacillus","g__Prevotella","g__Roseburia","g__Ruminococcus_L","g__Ruminococcus_R","g__Streptococcus","g__Veillonella")
 
-nparLD.pval.fxn(genus, genus.list, "nparLD/genus")
+nparLD.pval.fxn(genus, genus.list, "results/nparLD/genus")
 ```
 
 For families
 ```{r eval=FALSE}
 fam.list = c("f__Bifidobacteriaceae","f__Clostridiaceae","f__Enterobacteriaceae","f__Enterococcaceae","f__Lachnospiraceae","f__Lactobacillaceae","f__Ruminococcaceae","f__Streptococcaceae","f__Veillonellaceae","f__Verrucomicrobiaceae")
 
-nparLD.pval.fxn(family, fam.list, "nparLD/family")
+nparLD.pval.fxn(family, fam.list, "results/nparLD/family")
 ```
 
 ### Merge results
 Read in results
 ```{r npar.read.in}
-OTU.nparLD.pval = read.csv("nparLD/OTU.nparLD.csv")
-genus.nparLD.pval = read.csv("nparLD/genus.nparLD.csv")
-fam.nparLD.pval = read.csv("nparLD/family.nparLD.csv")
+OTU.nparLD.pval = read.csv("results/nparLD/OTU.nparLD.csv")
+genus.nparLD.pval = read.csv("results/nparLD/genus.nparLD.csv")
+fam.nparLD.pval = read.csv("results/nparLD/family.nparLD.csv")
 ```
 
 Merge, reformat, and save
@@ -180,7 +225,7 @@ nparLD.pval = OTU.nparLD.pval %>%
   group_by(taxon) %>% 
   spread(key=variable, value=pval)
 
-write.csv(nparLD.pval, "nparLD/all.nparLD.pval.csv", row.names=FALSE)
+write.csv(nparLD.pval, "results/nparLD/all.nparLD.pval.csv", row.names=FALSE)
 ```
 
 ## FDR correction
@@ -199,7 +244,7 @@ OTU.nparLD.fdr = OTU.nparLD.pval %>%
   # Remove original pvals
   dplyr::select(taxon, contains("fdr"))
 
-write.csv(OTU.nparLD.fdr, "nparLD/OTU.nparLD.fdr.csv", row.names=FALSE)
+write.csv(OTU.nparLD.fdr, "results/nparLD/OTU.nparLD.fdr.csv", row.names=FALSE)
 ```
 
 For genera
@@ -215,7 +260,7 @@ genus.nparLD.fdr = genus.nparLD.pval %>%
   # Remove original pvals
   dplyr::select(taxon, contains("fdr"))
 
-write.csv(genus.nparLD.fdr, "nparLD/genus.nparLD.fdr.csv", row.names=FALSE)
+write.csv(genus.nparLD.fdr, "results/nparLD/genus.nparLD.fdr.csv", row.names=FALSE)
 ```
 
 For families
@@ -231,7 +276,7 @@ fam.nparLD.fdr = fam.nparLD.pval %>%
   # Remove original pvals
   dplyr::select(taxon, contains("fdr"))
 
-write.csv(fam.nparLD.fdr, "nparLD/family.nparLD.fdr.csv", row.names=FALSE)
+write.csv(fam.nparLD.fdr, "results/nparLD/family.nparLD.fdr.csv", row.names=FALSE)
 ```
 
 ### Merge results
@@ -242,7 +287,7 @@ nparLD.fdr = OTU.nparLD.fdr %>%
   rbind(fam.nparLD.fdr) %>% 
   dplyr::select(taxon, starts_with("aov_")) 
 
-write.csv(nparLD.fdr, "nparLD/all.nparLD.fdr.csv", row.names=FALSE)
+write.csv(nparLD.fdr, "results/nparLD/all.nparLD.fdr.csv", row.names=FALSE)
 ```
 
 ## Pairwise Dunn
@@ -252,29 +297,29 @@ For OTUs
 ```{r eval=FALSE}
 OTU.list2=c("Otu00002", "Otu00003", "Otu00004", "Otu00005", "Otu00006", "Otu00008", "Otu00014", "Otu00015", "Otu00017", "Otu00024", "Otu00025", "Otu00027")
 
-dunn.pval.fxn(OTU, OTU.list2, "dunn/OTU")
+dunn.pval.fxn(OTU, OTU.list2, "results/dunn/OTU")
 ```
 
 For genera
 ```{r eval=FALSE}
 genus.list2 = c("g__Bacteroides", "g__Collinsella", "g__Enterococcus", "g__Escherichia", "g__Roseburia", "g__Ruminococcus_L", "g__Akkermansia", "g__Clostridium", "g__Lactobacillus")
 
-dunn.pval.fxn(genus, genus.list2, "dunn/genus")
+dunn.pval.fxn(genus, genus.list2, "results/dunn/genus")
 ```
 
 For families
 ```{r eval=FALSE}
 family.list2=c("f__Enterobacteriaceae", "f__Enterococcaceae", "f__Lachnospiraceae", "f__Verrucomicrobiaceae")
 
-dunn.pval.fxn(family, family.list2, "dunn/family")
+dunn.pval.fxn(family, family.list2, "results/dunn/family")
 ```
 
 ### Merge results
 Read in Dunn results
 ```{r dunn.read.in}
-OTU.dunn.fdr = read.csv("dunn/OTU.dunn.fdr.csv")
-genus.dunn.fdr = read.csv("dunn/genus.dunn.fdr.csv")
-fam.dunn.fdr = read.csv("dunn/family.dunn.fdr.csv")
+OTU.dunn.fdr = read.csv("results/dunn/OTU.dunn.fdr.csv")
+genus.dunn.fdr = read.csv("results/dunn/genus.dunn.fdr.csv")
+fam.dunn.fdr = read.csv("results/dunn/family.dunn.fdr.csv")
 ```
 
 Merge, select comparisons of interest, and save
@@ -291,7 +336,7 @@ dunn.fdr = OTU.dunn.fdr %>%
   group_by(taxon) %>% 
   spread(key=label, value=fdr_pval)
 
-write.csv(dunn.fdr, "dunn/all.dunn.fdr.csv", row.names=FALSE)
+write.csv(dunn.fdr, "results/dunn/all.dunn.fdr.csv", row.names=FALSE)
 ```
 
 ## Summarise results
@@ -306,7 +351,7 @@ all.fdr = nparLD.fdr %>%
   right_join(dunn.fdr, by="taxon") %>% 
   left_join(tax.temp, by="taxon")
 
-write.csv(all.fdr, "all.npar.dunn.fdr.csv", row.names=FALSE)
+write.csv(all.fdr, "results/all.npar.dunn.fdr.csv", row.names=FALSE)
 ```
 
 ## Mean +/- s.d.

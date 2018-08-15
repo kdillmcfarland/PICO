@@ -507,11 +507,68 @@ J.dist=as.matrix(vegdist(OTU, distance=&quot;jaccard&quot;))</code></pre>
 <div id="simper" class="section level2">
 <h2>SIMPER</h2>
 <p>Similarity percentages of Treatment:Time_Point at OTU, genus, and family levels</p>
-<pre class="r"><code>simper.pretty(x=OTU, metrics=meta, interesting=&quot;treat_time&quot;, perc_cutoff=1, low_cutoff='n', output_name=&quot;simper/OTU&quot;)
+<pre class="r"><code>simper.pretty(x=OTU, metrics=meta, interesting=&quot;treat_time&quot;, perc_cutoff=1, low_cutoff='n', output_name=&quot;results/simper/OTU&quot;)
 
-simper.pretty(x=genus, metrics=meta, interesting=&quot;treat_time&quot;, perc_cutoff=1, low_cutoff='n', low_val=0.001, output_name=&quot;simper/Genus&quot;)
+simper.pretty(x=genus, metrics=meta, interesting=&quot;treat_time&quot;, perc_cutoff=1, low_cutoff='n', low_val=0.001, output_name=&quot;results/simper/Genus&quot;)
 
-simper.pretty(x=family, metrics=meta, interesting=&quot;treat_time&quot;, perc_cutoff=1, low_cutoff='n', output_name=&quot;simper/Family&quot;)</code></pre>
+simper.pretty(x=family, metrics=meta, interesting=&quot;treat_time&quot;, perc_cutoff=1, low_cutoff='n', output_name=&quot;results/simper/Family&quot;)</code></pre>
+<div id="merge-results" class="section level3">
+<h3>Merge results</h3>
+<p>Read in SIMPER results and select at cutoffs</p>
+<ul>
+<li>OTUs and genera: minimum 2%</li>
+<li>families: minimum 5%</li>
+</ul>
+<pre class="r"><code>OTU.simper = read.csv(&quot;results/simper/OTU_clean_simper.csv&quot;) %&gt;% 
+  mutate(level=&quot;OTU&quot;) %&gt;% 
+  filter(SIMPER&gt;=0.02)
+  
+gen.simper = read.csv(&quot;results/simper/Genus_clean_simper.csv&quot;) %&gt;% 
+  mutate(level=&quot;genus&quot;) %&gt;% 
+  filter(SIMPER&gt;=0.02)
+  
+fam.simper = read.csv(&quot;results/simper/Family_clean_simper.csv&quot;) %&gt;% 
+  mutate(level=&quot;family&quot;) %&gt;% 
+  filter(SIMPER&gt;=0.05)</code></pre>
+<p>Merge and select comparisons of interest</p>
+<pre class="r"><code>all.simper = OTU.simper %&gt;% 
+  rbind(gen.simper) %&gt;% 
+  rbind(fam.simper) %&gt;% 
+  dplyr::select(-X) %&gt;% 
+  rename(taxon=OTU) %&gt;% 
+  filter(Comparison %in% c(&quot;Placebo_0_Placebo_4&quot;,
+                           &quot;Placebo_4_Placebo_8&quot;,
+                           &quot;Placebo_0_Placebo_8&quot;,
+                           &quot;Drug_0_Drug_4&quot;,
+                           &quot;Drug_4_Drug_8&quot;,
+                           &quot;Drug_0_Drug_8&quot;,
+                           &quot;Placebo_0_Drug_0&quot;,
+                           &quot;Placebo_4_Drug_4&quot;,
+                           &quot;Placebo_8_Drug_8&quot;))
+
+write.csv(all.simper, &quot;results/simper/all.simper.csv&quot;, row.names=FALSE)</code></pre>
+<p>Determine unique taxa lists of interest</p>
+<pre class="r"><code>unique(all.simper$taxon)</code></pre>
+<pre><code>##  [1] Otu00001               Otu00006               Otu00005              
+##  [4] Otu00002               Otu00032               Otu00007              
+##  [7] Otu00019               Otu00024               Otu00010              
+## [10] Otu00008               Otu00027               Otu00004              
+## [13] Otu00003               Otu00016               Otu00009              
+## [16] Otu00015               Otu00017               Otu00011              
+## [19] Otu00025               Otu00013               Otu00012              
+## [22] Otu00014               Otu00018               Otu00023              
+## [25] unclassified           g__Streptococcus       g__Enterococcus       
+## [28] g__Blautia             g__Lactobacillus       g__Akkermansia        
+## [31] g__Bifidobacterium     g__Clostridium         g__Dorea              
+## [34] g__Ruminococcus_L      g__Bacteroides         g__Escherichia        
+## [37] g__Prevotella          g__Ruminococcus_R      g__Coprococcus        
+## [40] g__Collinsella         g__Veillonella         g__Roseburia          
+## [43] g__Faecalibacterium    f__Lachnospiraceae     f__Streptococcaceae   
+## [46] f__Enterococcaceae     f__Ruminococcaceae     f__Lactobacillaceae   
+## [49] f__Enterobacteriaceae  f__Verrucomicrobiaceae f__Bifidobacteriaceae 
+## [52] f__Clostridiaceae      f__Veillonellaceae    
+## 2392 Levels: Otu00001 Otu00002 Otu00003 Otu00004 Otu00005 ... f__Xanthomonadaceae</code></pre>
+</div>
 </div>
 </div>
 <div id="taxa-of-interest" class="section level1">
@@ -522,21 +579,21 @@ simper.pretty(x=family, metrics=meta, interesting=&quot;treat_time&quot;, perc_c
 <p>For OTUs</p>
 <pre class="r"><code>OTU.list = c(&quot;Otu00001&quot;,&quot;Otu00002&quot;,&quot;Otu00003&quot;,&quot;Otu00004&quot;,&quot;Otu00005&quot;,&quot;Otu00006&quot;,&quot;Otu00007&quot;,&quot;Otu00008&quot;,&quot;Otu00009&quot;,&quot;Otu00010&quot;,&quot;Otu00011&quot;,&quot;Otu00012&quot;,&quot;Otu00013&quot;,&quot;Otu00014&quot;,&quot;Otu00015&quot;,&quot;Otu00016&quot;,&quot;Otu00017&quot;,&quot;Otu00019&quot;,&quot;Otu00023&quot;,&quot;Otu00024&quot;,&quot;Otu00025&quot;,&quot;Otu00027&quot;,&quot;Otu00032&quot;)
 
-nparLD.pval.fxn(OTU, OTU.list, &quot;nparLD/OTU&quot;)</code></pre>
+nparLD.pval.fxn(OTU, OTU.list, &quot;results/nparLD/OTU&quot;)</code></pre>
 <p>For genera</p>
 <pre class="r"><code>genus.list = c(&quot;g__Akkermansia&quot;,&quot;g__Bacteroides&quot;,&quot;g__Bifidobacterium&quot;,&quot;g__Blautia&quot;,&quot;g__Clostridium&quot;,&quot;g__Collinsella&quot;,&quot;g__Coprococcus&quot;,&quot;g__Dorea&quot;,&quot;g__Enterococcus&quot;,&quot;g__Escherichia&quot;,&quot;g__Faecalibacterium&quot;,&quot;g__Lactobacillus&quot;,&quot;g__Prevotella&quot;,&quot;g__Roseburia&quot;,&quot;g__Ruminococcus_L&quot;,&quot;g__Ruminococcus_R&quot;,&quot;g__Streptococcus&quot;,&quot;g__Veillonella&quot;)
 
-nparLD.pval.fxn(genus, genus.list, &quot;nparLD/genus&quot;)</code></pre>
+nparLD.pval.fxn(genus, genus.list, &quot;results/nparLD/genus&quot;)</code></pre>
 <p>For families</p>
 <pre class="r"><code>fam.list = c(&quot;f__Bifidobacteriaceae&quot;,&quot;f__Clostridiaceae&quot;,&quot;f__Enterobacteriaceae&quot;,&quot;f__Enterococcaceae&quot;,&quot;f__Lachnospiraceae&quot;,&quot;f__Lactobacillaceae&quot;,&quot;f__Ruminococcaceae&quot;,&quot;f__Streptococcaceae&quot;,&quot;f__Veillonellaceae&quot;,&quot;f__Verrucomicrobiaceae&quot;)
 
-nparLD.pval.fxn(family, fam.list, &quot;nparLD/family&quot;)</code></pre>
-<div id="merge-results" class="section level3">
+nparLD.pval.fxn(family, fam.list, &quot;results/nparLD/family&quot;)</code></pre>
+<div id="merge-results-1" class="section level3">
 <h3>Merge results</h3>
 <p>Read in results</p>
-<pre class="r"><code>OTU.nparLD.pval = read.csv(&quot;nparLD/OTU.nparLD.csv&quot;)
-genus.nparLD.pval = read.csv(&quot;nparLD/genus.nparLD.csv&quot;)
-fam.nparLD.pval = read.csv(&quot;nparLD/family.nparLD.csv&quot;)</code></pre>
+<pre class="r"><code>OTU.nparLD.pval = read.csv(&quot;results/nparLD/OTU.nparLD.csv&quot;)
+genus.nparLD.pval = read.csv(&quot;results/nparLD/genus.nparLD.csv&quot;)
+fam.nparLD.pval = read.csv(&quot;results/nparLD/family.nparLD.csv&quot;)</code></pre>
 <p>Merge, reformat, and save</p>
 <pre class="r"><code>nparLD.pval = OTU.nparLD.pval %&gt;% 
   rbind(genus.nparLD.pval) %&gt;% 
@@ -546,7 +603,7 @@ fam.nparLD.pval = read.csv(&quot;nparLD/family.nparLD.csv&quot;)</code></pre>
   group_by(taxon) %&gt;% 
   spread(key=variable, value=pval)
 
-write.csv(nparLD.pval, &quot;nparLD/all.nparLD.pval.csv&quot;, row.names=FALSE)</code></pre>
+write.csv(nparLD.pval, &quot;results/nparLD/all.nparLD.pval.csv&quot;, row.names=FALSE)</code></pre>
 </div>
 </div>
 <div id="fdr-correction" class="section level2">
@@ -564,7 +621,7 @@ write.csv(nparLD.pval, &quot;nparLD/all.nparLD.pval.csv&quot;, row.names=FALSE)<
   # Remove original pvals
   dplyr::select(taxon, contains(&quot;fdr&quot;))
 
-write.csv(OTU.nparLD.fdr, &quot;nparLD/OTU.nparLD.fdr.csv&quot;, row.names=FALSE)</code></pre>
+write.csv(OTU.nparLD.fdr, &quot;results/nparLD/OTU.nparLD.fdr.csv&quot;, row.names=FALSE)</code></pre>
 <p>For genera</p>
 <pre class="r"><code>genus.nparLD.fdr = genus.nparLD.pval %&gt;% 
   # Combing statistical test and variable into 1 term and remove originals
@@ -577,7 +634,7 @@ write.csv(OTU.nparLD.fdr, &quot;nparLD/OTU.nparLD.fdr.csv&quot;, row.names=FALSE
   # Remove original pvals
   dplyr::select(taxon, contains(&quot;fdr&quot;))
 
-write.csv(genus.nparLD.fdr, &quot;nparLD/genus.nparLD.fdr.csv&quot;, row.names=FALSE)</code></pre>
+write.csv(genus.nparLD.fdr, &quot;results/nparLD/genus.nparLD.fdr.csv&quot;, row.names=FALSE)</code></pre>
 <p>For families</p>
 <pre class="r"><code>fam.nparLD.fdr = fam.nparLD.pval %&gt;% 
   # Combing statistical test and variable into 1 term and remove originals
@@ -590,8 +647,8 @@ write.csv(genus.nparLD.fdr, &quot;nparLD/genus.nparLD.fdr.csv&quot;, row.names=F
   # Remove original pvals
   dplyr::select(taxon, contains(&quot;fdr&quot;))
 
-write.csv(fam.nparLD.fdr, &quot;nparLD/family.nparLD.fdr.csv&quot;, row.names=FALSE)</code></pre>
-<div id="merge-results-1" class="section level3">
+write.csv(fam.nparLD.fdr, &quot;results/nparLD/family.nparLD.fdr.csv&quot;, row.names=FALSE)</code></pre>
+<div id="merge-results-2" class="section level3">
 <h3>Merge results</h3>
 <p>Read in and merge FDR corrected nparLD p-values</p>
 <pre class="r"><code>nparLD.fdr = OTU.nparLD.fdr %&gt;% 
@@ -599,7 +656,7 @@ write.csv(fam.nparLD.fdr, &quot;nparLD/family.nparLD.fdr.csv&quot;, row.names=FA
   rbind(fam.nparLD.fdr) %&gt;% 
   dplyr::select(taxon, starts_with(&quot;aov_&quot;)) 
 
-write.csv(nparLD.fdr, &quot;nparLD/all.nparLD.fdr.csv&quot;, row.names=FALSE)</code></pre>
+write.csv(nparLD.fdr, &quot;results/nparLD/all.nparLD.fdr.csv&quot;, row.names=FALSE)</code></pre>
 </div>
 </div>
 <div id="pairwise-dunn" class="section level2">
@@ -608,21 +665,21 @@ write.csv(nparLD.fdr, &quot;nparLD/all.nparLD.fdr.csv&quot;, row.names=FALSE)</c
 <p>For OTUs</p>
 <pre class="r"><code>OTU.list2=c(&quot;Otu00002&quot;, &quot;Otu00003&quot;, &quot;Otu00004&quot;, &quot;Otu00005&quot;, &quot;Otu00006&quot;, &quot;Otu00008&quot;, &quot;Otu00014&quot;, &quot;Otu00015&quot;, &quot;Otu00017&quot;, &quot;Otu00024&quot;, &quot;Otu00025&quot;, &quot;Otu00027&quot;)
 
-dunn.pval.fxn(OTU, OTU.list2, &quot;dunn/OTU&quot;)</code></pre>
+dunn.pval.fxn(OTU, OTU.list2, &quot;results/dunn/OTU&quot;)</code></pre>
 <p>For genera</p>
 <pre class="r"><code>genus.list2 = c(&quot;g__Bacteroides&quot;, &quot;g__Collinsella&quot;, &quot;g__Enterococcus&quot;, &quot;g__Escherichia&quot;, &quot;g__Roseburia&quot;, &quot;g__Ruminococcus_L&quot;, &quot;g__Akkermansia&quot;, &quot;g__Clostridium&quot;, &quot;g__Lactobacillus&quot;)
 
-dunn.pval.fxn(genus, genus.list2, &quot;dunn/genus&quot;)</code></pre>
+dunn.pval.fxn(genus, genus.list2, &quot;results/dunn/genus&quot;)</code></pre>
 <p>For families</p>
 <pre class="r"><code>family.list2=c(&quot;f__Enterobacteriaceae&quot;, &quot;f__Enterococcaceae&quot;, &quot;f__Lachnospiraceae&quot;, &quot;f__Verrucomicrobiaceae&quot;)
 
-dunn.pval.fxn(family, family.list2, &quot;dunn/family&quot;)</code></pre>
-<div id="merge-results-2" class="section level3">
+dunn.pval.fxn(family, family.list2, &quot;results/dunn/family&quot;)</code></pre>
+<div id="merge-results-3" class="section level3">
 <h3>Merge results</h3>
 <p>Read in Dunn results</p>
-<pre class="r"><code>OTU.dunn.fdr = read.csv(&quot;dunn/OTU.dunn.fdr.csv&quot;)
-genus.dunn.fdr = read.csv(&quot;dunn/genus.dunn.fdr.csv&quot;)
-fam.dunn.fdr = read.csv(&quot;dunn/family.dunn.fdr.csv&quot;)</code></pre>
+<pre class="r"><code>OTU.dunn.fdr = read.csv(&quot;results/dunn/OTU.dunn.fdr.csv&quot;)
+genus.dunn.fdr = read.csv(&quot;results/dunn/genus.dunn.fdr.csv&quot;)
+fam.dunn.fdr = read.csv(&quot;results/dunn/family.dunn.fdr.csv&quot;)</code></pre>
 <p>Merge, select comparisons of interest, and save</p>
 <pre class="r"><code>dunn.fdr = OTU.dunn.fdr %&gt;% 
   rbind(genus.dunn.fdr) %&gt;% 
@@ -636,7 +693,7 @@ fam.dunn.fdr = read.csv(&quot;dunn/family.dunn.fdr.csv&quot;)</code></pre>
   group_by(taxon) %&gt;% 
   spread(key=label, value=fdr_pval)
 
-write.csv(dunn.fdr, &quot;dunn/all.dunn.fdr.csv&quot;, row.names=FALSE)</code></pre>
+write.csv(dunn.fdr, &quot;results/dunn/all.dunn.fdr.csv&quot;, row.names=FALSE)</code></pre>
 </div>
 </div>
 <div id="summarise-results" class="section level2">
@@ -652,7 +709,7 @@ all.fdr = nparLD.fdr %&gt;%
   left_join(tax.temp, by=&quot;taxon&quot;)</code></pre>
 <pre><code>## Warning: Column `taxon` joining factors with different levels, coercing to
 ## character vector</code></pre>
-<pre class="r"><code>write.csv(all.fdr, &quot;all.npar.dunn.fdr.csv&quot;, row.names=FALSE)</code></pre>
+<pre class="r"><code>write.csv(all.fdr, &quot;results/all.npar.dunn.fdr.csv&quot;, row.names=FALSE)</code></pre>
 </div>
 <div id="mean---s.d." class="section level2">
 <h2>Mean +/- s.d.</h2>
