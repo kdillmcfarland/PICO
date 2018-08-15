@@ -1,0 +1,466 @@
+---
+title: "PICO analysis"
+author: "Kim Dill-McFarland"
+date: "version `r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+editor_options:
+  chunk_output_type: console
+---
+<script>
+$(document).ready(function() {
+  $items = $('div#TOC li');
+  $items.each(function(idx) {
+    num_ul = $(this).parentsUntil('#TOC').length;
+    $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+  });
+});
+</script>
+
+# Setup
+```{r}
+sessionInfo()
+```
+
+Set seed for reproducibility
+```{r}
+set.seed(2486)
+```
+
+## Packages
+```{r Packages}
+#Community Ecology Package: Ordination, Diversity and Dissimilarities
+library(vegan)
+#Handling and analysis of high-throughput phylogenetic sequence data.
+library(phyloseq)
+#Data manipulation and plotting
+library(tidyverse)
+#Nonparametric Tests for Repeated Measures Data in Factorial Designs
+library(nparLD)
+#Fisheries stock assessment methods and data
+#Dunn's Kruskal-Wallis Multiple Comparisons
+library(FSA)
+```
+
+## Data
+### Import data
+Import microbiome data at OTU, genus, and family levels
+```{r}
+OTU = read.table("data/PICO.OTU.txt", header=TRUE, row.names=1, sep="\t")
+genus = read.table("data/Genus.txt", header=TRUE, row.names=1, sep="\t")
+family = read.table("data/Family.txt", header=TRUE, row.names=1, sep="\t")
+```
+
+Import full taxonomies of OTUs
+```{r}
+tax = read.table("data/PICO.tax.taxonomy", header=TRUE, sep="\t", row.names=1)
+```
+
+Import metadata of samples including alpha-diversity measures
+```{r}
+meta = read.table("data/PICO.meta.txt", header=TRUE, row.names=1, sep="\t")
+```
+
+### Sort data
+Sort data by sample names.
+```{r}
+OTU = OTU[order(row.names(OTU)),]
+genus = genus[(row.names(genus)),]
+family = family[(row.names(family)),]
+meta = meta[order(row.names(meta)),]
+```
+
+### Create variables
+Create a pairwise variable for Treatment:Time_point
+```{r}
+meta$treat_time = paste(meta$Treatment, meta$Time_Point, sep="_")
+```
+
+## Functions
+Load necessary custom functions
+```{r}
+#Function to run pairwise PERMANOVAs of all levels of a variable of interest across beta-diversity measures
+source("scripts/pairwise_adonis_all.R")
+
+#Similarity percentages (SIMPER) analysis of multiple variables
+source("scripts/simper.R")
+
+#Nonparametric Tests for Repeated Measures Data in Factorial Designs across multiple taxa
+source("scripts/nparLD.R")
+
+#Dunn's Kruskal-Wallis Multiple Comparisons across multiple taxa
+source("scripts/dunn.R")
+```
+
+# Beta-diversity
+## Calculate
+```{r calculate}
+BC.dist=as.matrix(vegdist(OTU, distance="bray"))
+J.dist=as.matrix(vegdist(OTU, distance="jaccard"))
+```
+
+## PERMANOVA
+Model: Treatment*Time_Point with Treatment:Time_Point removed if not significant
+
+```{r adonis}
+adonis(BC.dist ~ Treatment+as.factor(Time_Point), strata=as.factor(meta$Subject_ID), data = meta, permutations = 1000)
+adonis(J.dist ~ Treatment+as.factor(Time_Point), strata=as.factor(meta$Subject_ID), data = meta, permutations = 1000)
+```
+
+## Pairwise PERMANOVA
+Model: Pairwise within Treatment:Time_Point groups
+
+Within treatment, across time, strata by subject
+```{r pairwise.adonis}
+pairwise.adonis.all(OTU, meta, factors=meta$treat_time, sim.method="bray", stratify=TRUE, strata.factor=meta$Subject_ID, p.adjust.m="fdr")
+
+pairwise.adonis.all(OTU, meta, factors=meta$treat_time, sim.method="jaccard", stratify=TRUE, strata.factor=meta$Subject_ID, p.adjust.m="fdr")
+```
+
+Within time, between  treatments
+```{r}
+pairwise.adonis.all(OTU, meta, factors=meta$treat_time, sim.method="bray", stratify=FALSE, p.adjust.m="fdr")
+
+pairwise.adonis.all(OTU, meta, factors=meta$treat_time, sim.method="jaccard", stratify=FALSE, p.adjust.m="fdr")
+```
+
+## SIMPER
+Similarity percentages of Treatment:Time_Point at OTU, genus, and family levels
+```{r eval=FALSE}
+simper.pretty(x=OTU, metrics=meta, interesting="treat_time", perc_cutoff=1, low_cutoff='n', output_name="simper/OTU")
+
+simper.pretty(x=genus, metrics=meta, interesting="treat_time", perc_cutoff=1, low_cutoff='n', low_val=0.001, output_name="simper/Genus")
+
+simper.pretty(x=family, metrics=meta, interesting="treat_time", perc_cutoff=1, low_cutoff='n', output_name="simper/Family")
+```
+
+# Taxa of interest
+## ANOVA-like nparLD
+Nonparametric Tests for the F1-LD-F1 Design for taxa selected in SIMPER
+
+For OTUs
+```{r eval=FALSE}
+OTU.list = c("Otu00001","Otu00002","Otu00003","Otu00004","Otu00005","Otu00006","Otu00007","Otu00008","Otu00009","Otu00010","Otu00011","Otu00012","Otu00013","Otu00014","Otu00015","Otu00016","Otu00017","Otu00019","Otu00023","Otu00024","Otu00025","Otu00027","Otu00032")
+
+nparLD.pval.fxn(OTU, OTU.list, "nparLD/OTU")
+```
+
+For genera
+```{r eval=FALSE}
+genus.list = c("g__Akkermansia","g__Bacteroides","g__Bifidobacterium","g__Blautia","g__Clostridium","g__Collinsella","g__Coprococcus","g__Dorea","g__Enterococcus","g__Escherichia","g__Faecalibacterium","g__Lactobacillus","g__Prevotella","g__Roseburia","g__Ruminococcus_L","g__Ruminococcus_R","g__Streptococcus","g__Veillonella")
+
+nparLD.pval.fxn(genus, genus.list, "nparLD/genus")
+```
+
+For families
+```{r eval=FALSE}
+fam.list = c("f__Bifidobacteriaceae","f__Clostridiaceae","f__Enterobacteriaceae","f__Enterococcaceae","f__Lachnospiraceae","f__Lactobacillaceae","f__Ruminococcaceae","f__Streptococcaceae","f__Veillonellaceae","f__Verrucomicrobiaceae")
+
+nparLD.pval.fxn(family, fam.list, "nparLD/family")
+```
+
+### Merge results
+Read in results
+```{r npar.read.in}
+OTU.nparLD.pval = read.csv("nparLD/OTU.nparLD.csv")
+genus.nparLD.pval = read.csv("nparLD/genus.nparLD.csv")
+fam.nparLD.pval = read.csv("nparLD/family.nparLD.csv")
+```
+
+Merge, reformat, and save
+```{r npar.merge}
+nparLD.pval = OTU.nparLD.pval %>% 
+  rbind(genus.nparLD.pval) %>% 
+  rbind(fam.nparLD.pval) %>% 
+  filter(test=="aov") %>% 
+  dplyr::select(-test) %>% 
+  group_by(taxon) %>% 
+  spread(key=variable, value=pval)
+
+write.csv(nparLD.pval, "nparLD/all.nparLD.pval.csv", row.names=FALSE)
+```
+
+## FDR correction
+FDR correct nparLD p-values
+
+For OTUs
+```{r npar.fdr.OTU}
+OTU.nparLD.fdr = OTU.nparLD.pval %>% 
+  # Combing statistical test and variable into 1 term and remove originals
+  mutate(group=paste(test, variable, sep="_")) %>% 
+  dplyr::select(-test, -variable) %>% 
+  # Reformat to wide format
+  spread(key=group, value=pval) %>% 
+  # FDR correct pvals for each test_variable
+  mutate_if(is.numeric, funs(fdr = p.adjust(., method='fdr'))) %>% 
+  # Remove original pvals
+  dplyr::select(taxon, contains("fdr"))
+
+write.csv(OTU.nparLD.fdr, "nparLD/OTU.nparLD.fdr.csv", row.names=FALSE)
+```
+
+For genera
+```{r npar.fdr.gen}
+genus.nparLD.fdr = genus.nparLD.pval %>% 
+  # Combing statistical test and variable into 1 term and remove originals
+  mutate(group=paste(test, variable, sep="_")) %>% 
+  dplyr::select(-test, -variable) %>% 
+  # Reformat to wide format
+  spread(key=group, value=pval) %>% 
+  # FDR correct pvals for each test_variable
+  mutate_if(is.numeric, funs(fdr = p.adjust(., method='fdr'))) %>% 
+  # Remove original pvals
+  dplyr::select(taxon, contains("fdr"))
+
+write.csv(genus.nparLD.fdr, "nparLD/genus.nparLD.fdr.csv", row.names=FALSE)
+```
+
+For families
+```{r npar.fdr.fam}
+fam.nparLD.fdr = fam.nparLD.pval %>% 
+  # Combing statistical test and variable into 1 term and remove originals
+  mutate(group=paste(test, variable, sep="_")) %>% 
+  dplyr::select(-test, -variable) %>% 
+  # Reformat to wide format
+  spread(key=group, value=pval) %>% 
+  # FDR correct pvals for each test_variable
+  mutate_if(is.numeric, funs(fdr = p.adjust(., method='fdr'))) %>% 
+  # Remove original pvals
+  dplyr::select(taxon, contains("fdr"))
+
+write.csv(fam.nparLD.fdr, "nparLD/family.nparLD.fdr.csv", row.names=FALSE)
+```
+
+### Merge results
+Read in and merge FDR corrected nparLD p-values
+```{r npar.fdr.signif}
+nparLD.fdr = OTU.nparLD.fdr %>% 
+  rbind(genus.nparLD.fdr) %>% 
+  rbind(fam.nparLD.fdr) %>% 
+  dplyr::select(taxon, starts_with("aov_")) 
+
+write.csv(nparLD.fdr, "nparLD/all.nparLD.fdr.csv", row.names=FALSE)
+```
+
+## Pairwise Dunn
+Dunn's Kruskal-Wallis Multiple Comparisons for taxa selected in SIMPER
+
+For OTUs
+```{r eval=FALSE}
+OTU.list2=c("Otu00002", "Otu00003", "Otu00004", "Otu00005", "Otu00006", "Otu00008", "Otu00014", "Otu00015", "Otu00017", "Otu00024", "Otu00025", "Otu00027")
+
+dunn.pval.fxn(OTU, OTU.list2, "dunn/OTU")
+```
+
+For genera
+```{r eval=FALSE}
+genus.list2 = c("g__Bacteroides", "g__Collinsella", "g__Enterococcus", "g__Escherichia", "g__Roseburia", "g__Ruminococcus_L", "g__Akkermansia", "g__Clostridium", "g__Lactobacillus")
+
+dunn.pval.fxn(genus, genus.list2, "dunn/genus")
+```
+
+For families
+```{r eval=FALSE}
+family.list2=c("f__Enterobacteriaceae", "f__Enterococcaceae", "f__Lachnospiraceae", "f__Verrucomicrobiaceae")
+
+dunn.pval.fxn(family, family.list2, "dunn/family")
+```
+
+### Merge results
+Read in Dunn results
+```{r dunn.read.in}
+OTU.dunn.fdr = read.csv("dunn/OTU.dunn.fdr.csv")
+genus.dunn.fdr = read.csv("dunn/genus.dunn.fdr.csv")
+fam.dunn.fdr = read.csv("dunn/family.dunn.fdr.csv")
+```
+
+Merge, select comparisons of interest, and save
+```{r dunn.signif}
+dunn.fdr = OTU.dunn.fdr %>% 
+  rbind(genus.dunn.fdr) %>% 
+  rbind(fam.dunn.fdr) %>%
+  filter(!(label %in% c("0_Drug - 4_Placebo", 
+                        "0_Drug - 8_Placebo", 
+                        "4_Placebo - 8_Drug", 
+                        "0_Placebo - 4_Drug",
+                        "0_Placebo - 8_Drug",
+                        "4_Drug - 8_Placebo"))) %>% 
+  group_by(taxon) %>% 
+  spread(key=label, value=fdr_pval)
+
+write.csv(dunn.fdr, "dunn/all.dunn.fdr.csv", row.names=FALSE)
+```
+
+## Summarise results
+Merge all nparLD and Dunn p-values.
+```{r}
+tax.temp = tax %>%
+  rownames_to_column() %>% 
+  rename(taxon=rowname) %>% 
+  dplyr::select(taxon, Family, Genus)
+
+all.fdr = nparLD.fdr %>% 
+  right_join(dunn.fdr, by="taxon") %>% 
+  left_join(tax.temp, by="taxon")
+
+write.csv(all.fdr, "all.npar.dunn.fdr.csv", row.names=FALSE)
+```
+
+## Mean +/- s.d.
+Determine mean and standard deviation of abundances of taxa of interest within Treatment:Time_Point groups
+
+Calculate abundances
+```{r abunds}
+gen.abund = genus/rowSums(genus)
+fam.abund = family/rowSums(family)
+```
+
+### Bacteroides
+```{r Bacteroides}
+mean(gen.abund[meta$Time_Point == 0 & meta$Treatment == "Placebo" ,]$g__Bacteroides*100)
+sd(gen.abund[meta$Time_Point == 0 & meta$Treatment == "Placebo" ,]$g__Bacteroides*100)
+
+mean(gen.abund[meta$Time_Point == 4 & meta$Treatment == "Placebo" ,]$g__Bacteroides*100)
+sd(gen.abund[meta$Time_Point == 4 & meta$Treatment == "Placebo" ,]$g__Bacteroides*100)
+
+mean(gen.abund[meta$Time_Point == 8 & meta$Treatment == "Placebo" ,]$g__Bacteroides*100)
+sd(gen.abund[meta$Time_Point == 8 & meta$Treatment == "Placebo" ,]$g__Bacteroides*100)
+
+###
+
+mean(gen.abund[meta$Time_Point == 0 & meta$Treatment == "Drug" ,]$g__Bacteroides*100)
+sd(gen.abund[meta$Time_Point == 0 & meta$Treatment == "Drug" ,]$g__Bacteroides*100)
+
+mean(gen.abund[meta$Time_Point == 4 & meta$Treatment == "Drug" ,]$g__Bacteroides*100)
+sd(gen.abund[meta$Time_Point == 4 & meta$Treatment == "Drug" ,]$g__Bacteroides*100)
+
+mean(gen.abund[meta$Time_Point == 8 & meta$Treatment == "Drug" ,]$g__Bacteroides*100)
+sd(gen.abund[meta$Time_Point == 8 & meta$Treatment == "Drug" ,]$g__Bacteroides*100)
+```
+
+### Ruminococcus_L
+```{r Ruminococcus_L}
+mean(gen.abund[meta$Time_Point == 0 & meta$Treatment == "Placebo" ,]$g__Ruminococcus_L*100)
+sd(gen.abund[meta$Time_Point == 0 & meta$Treatment == "Placebo" ,]$g__Ruminococcus_L*100)
+
+mean(gen.abund[meta$Time_Point == 4 & meta$Treatment == "Placebo" ,]$g__Ruminococcus_L*100)
+sd(gen.abund[meta$Time_Point == 4 & meta$Treatment == "Placebo" ,]$g__Ruminococcus_L*100)
+
+mean(gen.abund[meta$Time_Point == 8 & meta$Treatment == "Placebo" ,]$g__Ruminococcus_L*100)
+sd(gen.abund[meta$Time_Point == 8 & meta$Treatment == "Placebo" ,]$g__Ruminococcus_L*100)
+
+###
+
+mean(gen.abund[meta$Time_Point == 0 & meta$Treatment == "Drug" ,]$g__Ruminococcus_L*100)
+sd(gen.abund[meta$Time_Point == 0 & meta$Treatment == "Drug" ,]$g__Ruminococcus_L*100)
+
+mean(gen.abund[meta$Time_Point == 4 & meta$Treatment == "Drug" ,]$g__Ruminococcus_L*100)
+sd(gen.abund[meta$Time_Point == 4 & meta$Treatment == "Drug" ,]$g__Ruminococcus_L*100)
+
+mean(gen.abund[meta$Time_Point == 8 & meta$Treatment == "Drug" ,]$g__Ruminococcus_L*100)
+sd(gen.abund[meta$Time_Point == 8 & meta$Treatment == "Drug" ,]$g__Ruminococcus_L*100)
+```
+
+### Verrucomicrobiaceae
+```{r Verrucomicrobiaceae}
+mean(fam.abund[meta$Time_Point == 0 & meta$Treatment == "Placebo" ,]$f__Verrucomicrobiaceae*100)
+sd(fam.abund[meta$Time_Point == 0 & meta$Treatment == "Placebo" ,]$f__Verrucomicrobiaceae*100)
+
+mean(fam.abund[meta$Time_Point == 4 & meta$Treatment == "Placebo" ,]$f__Verrucomicrobiaceae*100)
+sd(fam.abund[meta$Time_Point == 4 & meta$Treatment == "Placebo" ,]$f__Verrucomicrobiaceae*100)
+
+mean(fam.abund[meta$Time_Point == 8 & meta$Treatment == "Placebo" ,]$f__Verrucomicrobiaceae*100)
+sd(fam.abund[meta$Time_Point == 8 & meta$Treatment == "Placebo" ,]$f__Verrucomicrobiaceae*100)
+
+###
+
+mean(fam.abund[meta$Time_Point == 0 & meta$Treatment == "Drug" ,]$f__Verrucomicrobiaceae*100)
+sd(fam.abund[meta$Time_Point == 0 & meta$Treatment == "Drug" ,]$f__Verrucomicrobiaceae*100)
+
+mean(fam.abund[meta$Time_Point == 4 & meta$Treatment == "Drug" ,]$f__Verrucomicrobiaceae*100)
+sd(fam.abund[meta$Time_Point == 4 & meta$Treatment == "Drug" ,]$f__Verrucomicrobiaceae*100)
+
+mean(fam.abund[meta$Time_Point == 8 & meta$Treatment == "Drug" ,]$f__Verrucomicrobiaceae*100)
+sd(fam.abund[meta$Time_Point == 8 & meta$Treatment == "Drug" ,]$f__Verrucomicrobiaceae*100)
+```
+
+# Alpha-diversity
+## Normality
+Check normalilty of Shannon's diveristy metric
+```{r normal}
+plot(density(meta$shannon))
+
+# Plot using a qqplot
+qqnorm(meta$shannon)
+qqline(meta$shannon, col = 2)
+```
+
+## ANOVA
+Model:  Treatment*Time_Point with Treatment:Time_Point removed if not significant
+
+```{r Alpha}
+summary(aov(shannon ~ Treatment + as.factor(Time_Point) + Error(Subject_ID), data=meta))
+```
+
+## Pairwise t-test
+Model: Pairwise within Treatment:Time_Point groups
+
+```{r pairwise.alpha}
+pairwise.t.test(meta$shannon, meta$treat_time, p.adjust.method ="none")
+```
+
+## FDR correction
+FDR correct alpha-diversity p-values
+```{r alpha.fdr}
+p.adjust(c(0.660,0.886,0.779,0.897,0.143,0.098,0.064,0.100,0.836), method="fdr")
+```
+
+# Figures
+Order Treatment:Time_Point groups
+```{r ordered.var}
+meta$treat_time_ord = factor(meta$treat_time,c("Placebo_0","Drug_0","Placebo_4","Drug_4","Placebo_8","Drug_8"))  
+```
+
+## Alpha boxplot
+```{r alpha.plot}
+ggplot(meta, aes(x=treat_time_ord, y=shannon)) +
+  geom_boxplot() +
+  geom_point() +
+  theme_bw() +
+  labs(y = "Shannon's diveristy index", x = "")
+```
+
+## Taxa boxplots
+```{r taxa.plot}
+#Select family of interest
+fam.temp = fam.abund %>% 
+  rownames_to_column() %>% 
+  dplyr::select(rowname, f__Verrucomicrobiaceae)
+
+#Select genera of interest
+gen.temp = gen.abund %>% 
+  rownames_to_column() %>% 
+  dplyr::select(rowname, g__Bacteroides, g__Ruminococcus_L) 
+
+#merge with metadata
+meta %>% 
+  rownames_to_column() %>% 
+  dplyr::select(rowname, treat_time, treat_time_ord) %>% 
+  full_join(fam.temp, by="rowname") %>% 
+  full_join(gen.temp, by="rowname") %>% 
+  rename(Sample=rowname) %>% 
+  #reformat to long
+  gather(key="taxon", value="abund", -Sample, -treat_time, -treat_time_ord) %>% 
+
+  #plot
+ggplot() +
+  geom_boxplot(aes(x=treat_time_ord, y=abund)) +
+  theme_bw() +
+  labs(y = "Relative abundance (%)", x = "") +
+  facet_grid(taxon~.)
+```
+
+# FIN
